@@ -66,7 +66,7 @@ class Router:
         if min is not None:
             destination_ip, from_port, to_port, connection_ip, connection_port, uses_count, mtu = min[1]
             self.table[min[0]] = (destination_ip, from_port, to_port, connection_ip, connection_port, uses_count + 1, mtu)
-            return (connection_ip, connection_port, mtu)
+            return (connection_ip, connection_port), mtu
     
     def listen(self):
         """
@@ -88,11 +88,11 @@ class Router:
             print(f"message recieve: {message}")
             return
         
-        *next_router_address, mtu = self.check_route(ip, port)
+        next_router_address, mtu = self.check_route(ip, port)
 
         if next_router_address is not None:
             new_packet = create_packet((ip, port, ttl - 1, id, offset, size, flag, message))
             print(f"redirigiendo paquete |||{new_packet}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
-            self.router_socket.sendto(new_packet.encode(), tuple(next_router_address))
+            self.router_socket.sendto(new_packet.encode(), next_router_address)
         else:
             print(f"No hay rutas hacia {ip, port} para paquete {packet.decode()}")
