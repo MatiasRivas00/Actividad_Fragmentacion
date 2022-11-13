@@ -54,19 +54,19 @@ class Router:
         Parameters:
             address: IP,port
         Return:
-            next_router_address: tuple (IP,port)
+            next_router_address: tuple (IP,port, mtu)
         """
         min = None #(idx, route, min)
         for index, route in enumerate(self.table):
-            destination_ip, from_port, to_port, connection_ip, connection_port, uses_count = route
+            destination_ip, from_port, to_port, connection_ip, connection_port, uses_count, mtu = route
 
             if ip == destination_ip and port in range(from_port, to_port + 1):
                 if min is None or min[2] > uses_count:
                     min = (index, route, uses_count)
         if min is not None:
-            destination_ip, from_port, to_port, connection_ip, connection_port, uses_count = min[1]
-            self.table[min[0]] = (destination_ip, from_port, to_port, connection_ip, connection_port, uses_count + 1)
-            return (connection_ip, connection_port)
+            destination_ip, from_port, to_port, connection_ip, connection_port, uses_count, mtu = min[1]
+            self.table[min[0]] = (destination_ip, from_port, to_port, connection_ip, connection_port, uses_count + 1, mtu)
+            return (connection_ip, connection_port, mtu)
     
     def listen(self):
         """
@@ -78,7 +78,7 @@ class Router:
             None
         """
         packet, sender = self.router_socket.recvfrom(1024)
-        ip, port, ttl, message = parse_packet(packet.decode())
+        ip, port, ttl, id, offset, size, flag, message = parse_packet(packet.decode())
 
         if not ttl > 0:
             print(f"Se recibió paquete {packet.decode()} con TTL {ttl}")
@@ -88,11 +88,11 @@ class Router:
             print(f"message recieve: {message}")
             return
         
-        next_router_address = self.check_route(ip, port)
+        *next_router_address, mtu = self.check_route(ip, port)
 
         if next_router_address is not None:
-            new_packet = create_packet((ip, port, ttl - 1, message))
+            new_packet = create_packet((ip, port, ttl - 1, id, offset, size, flag, message))
             print(f"redirigiendo paquete |||{new_packet}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
-            self.router_socket.sendto(new_packet.encode(), next_router_address)
+            self.router_socket.sendto(new_packet.encode(), tuple(next_router_address))
         else:
             print(f"No hay rutas hacia {ip, port} para paquete {packet.decode()}")
