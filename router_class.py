@@ -7,22 +7,24 @@ def parse_packet(packet: str):
     Parameters:
         packet: str in IP,port,message format
     Return:
-        tuple: (IP,port,message)
+        tuple: (ip,port,ttl,id,offset,size,flag,message)
     """
-    ip, port, ttl, *message = tuple(packet.split(','))
-    return (ip, int(port), int(ttl), ','.join(message))
+    ip, port, ttl, id, offset, size, flag, *message = tuple(packet.split(','))
+    port, ttl, id, offset, size, flag = map(lambda x: int(x), (port, ttl, id, offset, size, flag))
+
+    return (ip, port, ttl, id, offset, size, flag, ','.join(message))
 
 def create_packet(args: tuple):
     """
     Create IP,port,message package format
 
     Parameters:
-        args: tuple (IP,port,message) format
+        args: tuple (ip,port,ttl,id,offset,size,flag,message) format
     Return:
-        str: "IP,port,message"
+        str: "ip,port,ttl,id,offset,size,flag,message"
     """
-    ip, port, ttl, message = args
-    return f"{ip},{port},{ttl},{message}"
+    ip, port, ttl, id, offset, size, flag, message = args
+    return f"{ip},{port},{ttl},{id},{offset},{size},{flag},{message}"
 
 
 class Router:
@@ -94,4 +96,3 @@ class Router:
             self.router_socket.sendto(new_packet.encode(), next_router_address)
         else:
             print(f"No hay rutas hacia {ip, port} para paquete {packet.decode()}")
-        
