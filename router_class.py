@@ -172,8 +172,8 @@ class Router:
             id: id of the received packet fragment
         """
         def get_offset(ip_packet):
-            _, _, _, _, offset, *_ = self.parse_packet(packet_fragment)
-            return int(offset)
+            _, _, _, _, offset, *_ = self.parse_packet(ip_packet)
+            return offset
         
         _, _, _, id, *_ = self.parse_packet(packet_fragment)
         if id in self.received_fragments:
