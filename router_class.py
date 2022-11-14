@@ -31,22 +31,24 @@ def create_packet(args: tuple):
 
 def fragment_ip_packet(ip_packet: bytearray, mtu):
     if len(ip_packet) <= mtu:
-        return [ip_packet]
+        print("holaaa")
+        return [ip_packet.decode()]
 
-    ip, port, ttl, id, offset, size, flag, message = parse_packet(ip_packet)
+    ip, port, ttl, id, offset, size, flag, message = parse_packet(ip_packet.decode())
     headers = create_packet((ip, port, ttl, id, offset, size, flag,"")) # empty message with headers
     headers_size = len(headers)
     message_max_size = mtu - headers_size 
+    encoded_message = message.encode()
     packet_fragments = []
 
     for _from in range(0, size, message_max_size):
         to = min(_from + message_max_size, size)
-        fragment_message = message[_from:to]
-        fragment_flag = int(bool(flag) or to!=message_max_size)
+        fragment_message = encoded_message[_from:to].decode()
+        fragment_flag = int(bool(flag) or to!=size)
         fragment_size = len(fragment_message)
         fragment_offset = offset + _from
 
-        packet_fragment = create_packet(ip, port, ttl, id, fragment_offset, fragment_size, fragment_flag, fragment_message)
+        packet_fragment = create_packet((ip, port, ttl - 1, id, fragment_offset, fragment_size, fragment_flag, fragment_message))
         packet_fragments.append(packet_fragment)
     
     return packet_fragments
@@ -102,8 +104,8 @@ class Router:
         Return:
             None
         """
-        packet, sender = self.router_socket.recvfrom(1024)
-        ip, port, ttl, id, offset, size, flag, message = parse_packet(packet.decode())
+        packet, _ = self.router_socket.recvfrom(1024)
+        ip, port, ttl, *_, message = parse_packet(packet.decode())
 
         if not ttl > 0:
             print(f"Se recibió paquete {packet.decode()} con TTL {ttl}")
@@ -116,11 +118,11 @@ class Router:
         next_router_address, mtu = self.check_route(ip, port)
 
         if next_router_address is not None:
-            new_packet = create_packet((ip, port, ttl - 1, id, offset, size, flag, message))
-            self.router_socket.sendto(new_packet.encode(), next_router_address)
+            packet_fragments = fragment_ip_packet(packet, mtu)
+            for packet_fragment in packet_fragments:
+                self.router_socket.sendto(packet_fragment.encode(), next_router_address)
 
-            print(f"redirigiendo paquete |||{new_packet}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
+                print(f"redirigiendo paquete |||{packet_fragment}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
 
         else:
             print(f"No hay rutas hacia {ip, port} para paquete {packet.decode()}")
-            
