@@ -1,5 +1,6 @@
 import socket
 
+
 def parse_packet(packet: str):
     """
     Parse IP,port,message package format
@@ -24,7 +25,31 @@ def create_packet(args: tuple):
         str: "ip,port,ttl,id,offset,size,flag,message"
     """
     ip, port, ttl, id, offset, size, flag, message = args
-    return f"{ip},{port},{ttl},{id},{offset},{size},{flag},{message}"
+    size_zeros = "0"*(8 - len(str(size)))
+    offset_zeros = "0"*(8 - len(str(offset)))
+    return f"{ip},{port},{ttl},{id},{offset_zeros}{offset},{size_zeros}{size},{flag},{message}"
+
+def fragment_ip_packet(ip_packet: bytearray, mtu):
+    if len(ip_packet) <= mtu:
+        return [ip_packet]
+
+    ip, port, ttl, id, offset, size, flag, message = parse_packet(ip_packet)
+    headers = create_packet((ip, port, ttl, id, offset, size, flag,"")) # empty message with headers
+    headers_size = len(headers)
+    message_max_size = mtu - headers_size 
+    packet_fragments = []
+
+    for _from in range(0, size, message_max_size):
+        to = min(_from + message_max_size, size)
+        fragment_message = message[_from:to]
+        fragment_flag = int(bool(flag) or to!=message_max_size)
+        fragment_size = len(fragment_message)
+        fragment_offset = offset + _from
+
+        packet_fragment = create_packet(ip, port, ttl, id, fragment_offset, fragment_size, fragment_flag, fragment_message)
+        packet_fragments.append(packet_fragment)
+    
+    return packet_fragments
 
 
 class Router:
@@ -92,7 +117,10 @@ class Router:
 
         if next_router_address is not None:
             new_packet = create_packet((ip, port, ttl - 1, id, offset, size, flag, message))
-            print(f"redirigiendo paquete |||{new_packet}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
             self.router_socket.sendto(new_packet.encode(), next_router_address)
+
+            print(f"redirigiendo paquete |||{new_packet}||| con destino final {ip, port} desde {self.ip, self.port} hacia {next_router_address}")
+
         else:
             print(f"No hay rutas hacia {ip, port} para paquete {packet.decode()}")
+            
